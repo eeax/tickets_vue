@@ -1,36 +1,69 @@
 <template>
   <div class="container mx-auto p-6">
-    <form class="flex flex-col gap-2" @submit.prevent="addMessage">
-      <textarea class="p-3 rounded-lg resize-none flex-1" rows="6" v-model="message" placeholder="Ваше сообщение..." required></textarea>
-      <input type="email" v-model="email" placeholder="Ваша почта (не обязательно)" class="p-3 rounded-lg min-h-10 flex-1">
-      <button class="btn bg-green-400 rounded-lg h-11" type="submit">отправить</button>
-    </form>
-    <ul class="space-y-2 mt-10">
-      <Ticket v-for="(message, index) in messages" :key="index" :text="message.text" />
-    </ul>
+    <TicketForm @submit="addTicket"/>
+    <TicketList :tickets="tickets" @delete="deleteTicket" />
   </div>
 </template>
 
 <script>
-import Ticket from './components/Ticket.vue'
+import axios from 'axios'
+import TicketForm from './components/TicketForm.vue'
+import TicketList from './components/TicketList.vue'
+import { API_URL } from "./constants.js";
 
 export default {
   components: {
-    Ticket
+    TicketForm,
+    TicketList
   },
   data () {
     return {
-      message: "",
-      email: "",
-      messages: [],
+      tickets: [],
+      apiURL: API_URL,
     }
   },
   methods: {
-    addMessage() {
-      this.messages.push({ text: this.message, email: this.email });
-      this.message = "";
-      this.email = "";
+    addTicket(ticket) {
+      if (!ticket || typeof ticket !== 'object' || !(ticket.text || ticket.email || ticket.file)) {
+        return;
+      }
+
+      const formData = new FormData();
+
+      formData.append("text", ticket.text || '');
+      formData.append("email", ticket.email || '');
+
+      if(ticket.file) {
+        formData.append("file", ticket.file);
+      }
+
+      Promise.resolve(axios.post(this.apiURL, formData))
+          .then(response => {
+            this.tickets.push(response.data);
+          })
+          .catch(error => {
+            console.log(error)
+          });
+    },
+
+    deleteTicket(ticketId) {
+      axios.delete(`${this.apiURL}/${ticketId}`)
+          .then(() => {
+            this.tickets = this.tickets.filter(ticket => ticket.id !== ticketId);
+          })
+          .catch(error => {
+            console.error(error);
+          });
     }
+  },
+  created() {
+    axios.get(this.apiURL)
+        .then(response => {
+          this.tickets = response.data;
+        })
+        .catch((error) => {
+          console.log(error);
+        })
   }
 }
 </script>
